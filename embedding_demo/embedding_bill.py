@@ -7,6 +7,9 @@ from langchain_openai import AzureOpenAIEmbeddings, AzureChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
+import azure.search.documents as search_docs
+
+
 
 load_dotenv()
 
@@ -66,9 +69,14 @@ def create_rag_chain():
 
 if __name__ == "__main__":
     try:
+        print("Azure SDK is ready.")
         rag_chain = create_rag_chain()
-        response = rag_chain.invoke({"question": "What are the key points of bill id 113?"})
+        response = rag_chain.invoke({"question": "How could you explain about Taxpayer's Right to View Act of 1993?"})
         print("RAG Answer:", response)
     finally:
+        if 'rag_chain' in locals():
+            del rag_chain  # Explicitly delete to trigger cleanup
+            
+        import gc
         # Force garbage collection to avoid the AzureSearch __del__ shutdown error
         gc.collect()
