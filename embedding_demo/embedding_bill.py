@@ -2,46 +2,40 @@ import os
 import gc
 from dotenv import load_dotenv
 from operator import itemgetter
-
 from langchain_community.vectorstores.azuresearch import AzureSearch
 from langchain_openai import AzureOpenAIEmbeddings, AzureChatOpenAI
-from langchain_community.document_loaders import CSVLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 
 load_dotenv()
 
-def format_docs(docs):
-    return "\n\n".join([d.page_content for d in docs])
-
-def create_index(csv_path: str):
-    loader = CSVLoader(file_path=csv_path)
-    docs = loader.load()
-    
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-    splits = text_splitter.split_documents(docs)
-    
-    embedding = AzureOpenAIEmbeddings(
+# 1. Setup Embeddings
+def get_embeddings():
+    return AzureOpenAIEmbeddings(
         azure_deployment=os.getenv("EMBEDDING_SERVICE_DEPLOYMENT"),
         azure_endpoint=os.getenv("EMBEDDING_SERVICE_ENDPOINT"),
         api_key=os.getenv("EMBEDDING_SERVICE_KEY"),
         api_version=os.getenv("EMBEDDING_SERVICE_VERSION")
     )
 
-    vector_store = AzureSearch(
+# 2. Setup Vector Store (Connect to EXISTING index, DO NOT RECREATE)
+def get_vector_store():
+    embedding = get_embeddings()
+    return AzureSearch(
         azure_search_endpoint=os.getenv("SEARCH_SERVICE_NAME"),
         azure_search_key=os.getenv("SEARCH_API_KEY"),
-        index_name=os.getenv("SEARCH_INDEX_NAME"),
+        index_name="bills-index",  # Must match your JSON
         embedding_function=embedding.embed_query,
+        # Map your custom schema fields from your JSON
+        content_key="content",
+        vector_key="content_vector",
+        metadata_key="metadata"
     )
-    #vector_store.clear_all_documents()  # Clear existing documents in the index
-    vector_store.add_documents(splits)
-    return vector_store.as_retriever(search_type="hybrid")
 
-def create_rag_chain(csv_path: str):
-    retriever = create_index(csv_path)
+# 3. Setup Chain
+def create_rag_chain():
+    retriever = get_vector_store().as_retriever(search_type="hybrid")
     
     llm = AzureChatOpenAI(
         azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
@@ -51,17 +45,16 @@ def create_rag_chain(csv_path: str):
         temperature=0.0,
     )
 
-    # Clean prompt structure
     prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are a helpful legal assistant. Answer using ONLY the provided context."),
+        ("system", "You are a helpful assistant. Use ONLY the provided context."),
         ("human", "Context:\n{context}\n\nQuestion:\n{question}")
     ])
 
-    # The Chain: 
-    # 1. Takes input dict {"question": "..."}
-    # 2. Uses "question" to fetch context
-    # 3. Formats context
-    # 4. Passes everything to the prompt
+    # Helper to clean retrieved documents
+    def format_docs(docs):
+        return "\n\n".join([d.page_content for d in docs])
+
+    # LCEL Chain
     chain = (
         {"context": itemgetter("question") | retriever | format_docs, 
          "question": itemgetter("question")}
@@ -69,13 +62,13 @@ def create_rag_chain(csv_path: str):
         | llm
         | StrOutputParser()
     )
-    
     return chain
 
 if __name__ == "__main__":
-    rag_chain = create_rag_chain("bill_sum_data.csv")
-    
-    # Pass the input as a dictionary matching the "question" key
-    response = rag_chain.invoke({"question": "What are the key points of bill id 113?"})
-    print("RAG Answer:", response)
-    gc.collect()
+    try:
+        rag_chain = create_rag_chain()
+        response = rag_chain.invoke({"question": "What are the key points of bill id 113?"})
+        print("RAG Answer:", response)
+    finally:
+        # Force garbage collection to avoid the AzureSearch __del__ shutdown error
+        gc.collect()
