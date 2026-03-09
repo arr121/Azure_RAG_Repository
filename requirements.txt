@@ -3,3 +3,7 @@ langchain_openai
 langchain_text_splitters
 langchain_classic
 langchain_core
+azure-search-documents
+azure-identity
+langchain
+openai
