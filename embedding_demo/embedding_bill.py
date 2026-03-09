@@ -11,6 +11,8 @@ from langchain_openai import (
 from langchain_classic.chains import RetrievalQA
 from langchain_classic.agents import AgentExecutor, create_react_agent
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
+from langchain_core.runnables import RunnablePassthrough
+from langchain_core.output_parsers import StrOutputParser
 #from langchain_community.chains import RetrievalQA
 #from langchain.agents import AgentExecutor, create_react_agent
 from langchain_core.tools import create_retriever_tool
@@ -64,39 +66,24 @@ def create_rag_agent(csv_path: str):
     Answer:"""
     PROMPT = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
     
-    rag_chain = RetrievalQA.from_chain_type(
+    '''rag_chain = RetrievalQA.from_chain_type(
         llm=llm,
         chain_type="stuff",
         retriever=retriever,
         return_source_documents=True,
         chain_type_kwargs={"prompt": PROMPT}
-    )
+    )'''
+    chain = (
+    {"context": retriever, "question": RunnablePassthrough()}
+    | prompt
+    | llm
+    | StrOutputParser()
+)
     
     # Test RAG chain
-    response = rag_chain.invoke({"query": "What did the president say about Ketanji Brown Jackson?"})
+    response = chain.invoke({"query": "How do you explain about Taxpayer's Right to View Act of 1993?"})
     print("RAG Answer:", response["result"])
-    
-    # Agent Tool (retriever as tool)
-    retriever_tool = create_retriever_tool(
-        retriever,
-        "csv_search",
-        "Search CSV data for relevant information. Use for RAG queries."
-    )
-    tools = [retriever_tool]
-    
-    # ReAct Agent (stable)
-    agent_prompt = PromptTemplate.from_template("""
-    Answer questions about CSV data using tools. Be specific, cite sources.
-    
-    {chat_history}
-    Question: {input}
-    Thought: {agent_scratchpad}
-    """)
-    
-    agent = create_react_agent(llm, tools, agent_prompt)
-    agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
-    
-    return agent_executor
+    return response
 
 # 3. Usage
 if __name__ == "__main__":
