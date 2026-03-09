@@ -36,6 +36,7 @@ def create_index(csv_path: str):
         index_name=os.getenv("SEARCH_INDEX_NAME"),
         embedding_function=embedding.embed_query,
     )
+    #vector_store.clear_all_documents()  # Clear existing documents in the index
     vector_store.add_documents(splits)
     return vector_store.as_retriever(search_type="hybrid")
 
@@ -77,5 +78,4 @@ if __name__ == "__main__":
     # Pass the input as a dictionary matching the "question" key
     response = rag_chain.invoke({"question": "What are the key points of bill id 113?"})
     print("RAG Answer:", response)
-    
     gc.collect()
