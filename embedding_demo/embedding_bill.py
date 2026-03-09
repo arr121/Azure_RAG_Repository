@@ -60,12 +60,27 @@ def create_rag_agent(csv_path: str):
         temperature=0.0,
     )
      # RAG Chain (RetrievalQA - stable replacement)
-    prompt_template = """Use the CSV data below to answer. If unknown, say so.
-    Data :{context}
-    Question: {question}
-    Answer:"""
-    PROMPT = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
-    
+    system_message = """
+        You are a helpful assistant specialized in answering questions about legal bills.
+        Answer the user's question using ONLY the provided context below.
+        If the answer is not in the context, state that you do not have enough information.
+        """
+
+    # 2. Human Prompt: Contains the dynamic data (context + question)
+    human_message = """
+    Context:
+    {context}
+
+    Question:
+    {question}
+    """
+
+    # Combine into a ChatPromptTemplate
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", system_message),
+        ("human", human_message)
+    ])
+        
     '''rag_chain = RetrievalQA.from_chain_type(
         llm=llm,
         chain_type="stuff",
@@ -74,17 +89,18 @@ def create_rag_agent(csv_path: str):
         chain_type_kwargs={"prompt": PROMPT}
     )'''
     chain = (
-    {"context": retriever, "question": RunnablePassthrough()}
+    {"context": retriever | format_docs, "question": RunnablePassthrough()}
     | prompt
     | llm
-    | StrOutputParser()
-)
+    )
     
     # Test RAG chain
     response = chain.invoke({"query": "How do you explain about Taxpayer's Right to View Act of 1993?"})
     print("RAG Answer:", response["result"])
     return response
-
+#4 . Helper function to format retrieved documents for the prompt
+def format_docs(docs):
+    return "\n\n".join([d.page_content for d in docs])
 # 3. Usage
 if __name__ == "__main__":
     agent_executor = create_rag_agent("bill_sum_data.csv")  # Upload your CSV here
