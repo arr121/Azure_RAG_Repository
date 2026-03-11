@@ -2,6 +2,7 @@ from azure.search.documents import SearchClient
 from .config import settings
 from azure.core.credentials import AzureKeyCredential
 
+# Configure the Azure Search
 search_client = SearchClient(
     endpoint=settings.AZURE_SEARCH_ENDPOINT,
     index_name=settings.AZURE_SEARCH_INDEX,
