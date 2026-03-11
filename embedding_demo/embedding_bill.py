@@ -16,10 +16,10 @@ load_dotenv()
 # 1. Setup Embeddings
 def get_embeddings():
     return AzureOpenAIEmbeddings(
-        azure_deployment=os.getenv("EMBEDDING_SERVICE_DEPLOYMENT"),
-        azure_endpoint=os.getenv("EMBEDDING_SERVICE_ENDPOINT"),
-        api_key=os.getenv("EMBEDDING_SERVICE_KEY"),
-        api_version=os.getenv("EMBEDDING_SERVICE_VERSION")
+        azure_embedding_deployment=os.getenv("EMBEDDING_SERVICE_DEPLOYMENT"),
+        azure_embedding_endpoint=os.getenv("EMBEDDING_SERVICE_ENDPOINT"),
+        embedding_api_key=os.getenv("EMBEDDING_SERVICE_KEY"),
+        embedding_api_version=os.getenv("EMBEDDING_SERVICE_VERSION")
     )
 
 # 2. Setup Vector Store (Connect to EXISTING index, DO NOT RECREATE)

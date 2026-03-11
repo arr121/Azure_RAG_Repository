@@ -9,3 +9,5 @@ langchain
 openai
 six
 operator
+fastapi
+uvicorn
